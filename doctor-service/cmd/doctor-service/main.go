@@ -95,7 +95,7 @@ func main() {
 }
 
 func runMigrations(dbURL string) {
-	m, err := migrate.New("file://../../migrations", dbURL)
+	m, err := migrate.New("file://migrations", dbURL)
 	if err != nil {
 		log.Fatalf("Migration init error: %v", err)
 	}
