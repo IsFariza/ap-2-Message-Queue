@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  # Message Broker for all services
+  nats:
+    image: nats:latest
+    ports:
+      - "4222:4222"
+
+  # Database for Doctor Service
+  doctor-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: doctor_db
+    ports:
+      - "5431:5432" # We use 5431 to avoid conflict with the other DB
+
+  # Database for Appointment Service
+  appointment-db:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: appointment_db
+    ports:
+      - "5432:5432"
