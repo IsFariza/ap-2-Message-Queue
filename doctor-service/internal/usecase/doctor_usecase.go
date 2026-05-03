@@ -4,7 +4,6 @@ import (
 	"context"
 	"log"
 
-	"github.com/IsFariza/ap2-Message-Queue/doctor-service/internal/event"
 	"github.com/IsFariza/ap2-Message-Queue/doctor-service/internal/model"
 	"github.com/IsFariza/ap2-Message-Queue/doctor-service/internal/model/interfaces"
 	"github.com/google/uuid"
@@ -12,10 +11,10 @@ import (
 
 type doctorUseCase struct {
 	repo      interfaces.DoctorRepository
-	publisher *event.DoctorPublisher
+	publisher interfaces.DoctorPublisher
 }
 
-func NewDoctorUseCase(repo interfaces.DoctorRepository, pub *event.DoctorPublisher) interfaces.DoctorUseCase {
+func NewDoctorUseCase(repo interfaces.DoctorRepository, pub interfaces.DoctorPublisher) interfaces.DoctorUseCase {
 	return &doctorUseCase{
 		repo:      repo,
 		publisher: pub,
