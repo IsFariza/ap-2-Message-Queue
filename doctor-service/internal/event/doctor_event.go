@@ -7,24 +7,21 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-type DoctorPublisher struct {
+type doctorPublisher struct {
 	nc *nats.Conn
 }
 
-func NewDoctorPublisher(nc *nats.Conn) *DoctorPublisher {
-	return &DoctorPublisher{nc: nc}
+func NewDoctorPublisher(nc *nats.Conn) *doctorPublisher {
+	return &doctorPublisher{nc: nc}
 }
 
-func (p *DoctorPublisher) PublishDoctorCreated(doc *model.Doctor) error {
-	// 1. Define the subject (the "channel")
+func (p *doctorPublisher) PublishDoctorCreated(doc *model.Doctor) error {
+
 	subject := "doctor.created"
 
-	// 2. Convert your doctor data to JSON bytes
 	data, err := json.Marshal(doc)
 	if err != nil {
 		return err
 	}
-
-	// 3. Send it to NATS
 	return p.nc.Publish(subject, data)
 }
