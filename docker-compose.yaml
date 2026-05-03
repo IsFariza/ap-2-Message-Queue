@@ -26,3 +26,22 @@ services:
       POSTGRES_DB: appointment_db
     ports:
       - "5432:5432"
+
+  doctor-service:
+    build: ./doctor-service
+    env_file: .env
+    ports:
+      - "50051:50051"
+    depends_on:
+      - doctor-db
+      - nats
+
+  appointment-service:
+    build: ./appointment-service
+    env_file: .env
+    ports:
+      - "50052:50052"
+    depends_on:
+      - appointment-db
+      - nats
+      - doctor-service
