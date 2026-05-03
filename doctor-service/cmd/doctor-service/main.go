@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"database/sql"
 	"log"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/IsFariza/ap2-Message-Queue/doctor-service/internal/event"
 	"github.com/IsFariza/ap2-Message-Queue/doctor-service/internal/repository"
@@ -22,25 +25,34 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load("../../.env"); err != nil {
-		log.Println(".env not found")
+	// 1. Load Configurations
+	if err := godotenv.Load(); err != nil {
+		log.Println(".env not found, using system environment variables")
 	}
 
 	dbURL := os.Getenv("DATABASE_URL")
-
 	natsURL := os.Getenv("NATS_URL")
+	grpcPort := os.Getenv("PORT")
+	if grpcPort == "" {
+		grpcPort = "50051" // Fallback default
+	}
 
+	// 2. Connect to PostgreSQL
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
+	defer db.Close()
+
 	if err := db.Ping(); err != nil {
 		log.Fatalf("Failed to ping database: %v", err)
 	}
-	log.Println("Successfully connected to postgreSQL")
+	log.Println("Successfully connected to PostgreSQL")
 
+	// 3. Run Migrations
 	runMigrations(dbURL)
 
+	// 4. Connect to NATS
 	nc, err := nats.Connect(natsURL)
 	if err != nil {
 		log.Fatalf("Failed to connect to NATS: %v", err)
@@ -48,24 +60,38 @@ func main() {
 	defer nc.Close()
 	log.Println("Successfully connected to NATS")
 
+	// 5. Wire up Layers (Dependency Injection)
 	repo := repository.NewDoctorRepository(db)
 	pub := event.NewDoctorPublisher(nc)
 	uc := usecase.NewDoctorUseCase(repo, pub)
 	handler := grpcHandler.NewDoctorHandler(uc)
 
-	lis, err := net.Listen("tcp", ":50051")
+	// 6. Setup gRPC Server
+	lis, err := net.Listen("tcp", ":"+grpcPort)
 	if err != nil {
-		log.Fatalf("Failed to listen on port 50051: %v", err)
+		log.Fatalf("Failed to listen on port %s: %v", grpcPort, err)
 	}
 
-	s := grpc.NewServer()
+	server := grpc.NewServer()
+	pb.RegisterDoctorServiceServer(server, handler)
 
-	pb.RegisterDoctorServiceServer(s, handler)
+	// 7. Graceful Shutdown Setup
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
-	log.Println("Doctor Service is listening on 50051")
-	if err := s.Serve(lis); err != nil {
-		log.Fatalf("Failed to serve grpc: %v", err)
-	}
+	go func() {
+		log.Printf("Doctor Service listening on %s", grpcPort)
+		if err := server.Serve(lis); err != nil && err != grpc.ErrServerStopped {
+			log.Fatalf("Failed to serve grpc: %v", err)
+		}
+	}()
+
+	// Wait for interruption signal
+	<-ctx.Done()
+	log.Println("Shutting down Doctor Service gracefully...")
+
+	server.GracefulStop()
+	log.Println("Doctor Service stopped safely.")
 }
 
 func runMigrations(dbURL string) {
@@ -76,7 +102,7 @@ func runMigrations(dbURL string) {
 
 	if err := m.Up(); err != nil {
 		if err == migrate.ErrNoChange {
-			log.Println("No changes in database")
+			log.Println("Database is up to date")
 		} else {
 			log.Fatalf("Migration failed: %v", err)
 		}
